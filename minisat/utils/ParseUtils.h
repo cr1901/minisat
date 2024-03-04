@@ -24,7 +24,9 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include <stdlib.h>
 #include <stdio.h>
 
-#include <zlib.h>
+#ifndef MINISAT_LIBRARY_ONLY
+    #include <zlib.h>
+#endif
 
 #include "minisat/mtl/XAlloc.h"
 
@@ -34,38 +36,40 @@ namespace Minisat {
 // A simple buffered character stream class:
 
 
+#ifndef MINISAT_LIBRARY_ONLY
+    class StreamBuffer {
+        gzFile         in;
+        unsigned char* buf;
+        int            pos;
+        int            size;
 
-class StreamBuffer {
-    gzFile         in;
-    unsigned char* buf;
-    int            pos;
-    int            size;
+        enum { buffer_size = 64*1024 };
 
-    enum { buffer_size = 64*1024 };
+        void assureLookahead() {
+            if (pos >= size) {
+                pos  = 0;
+                size = gzread(in, buf, buffer_size); } }
 
-    void assureLookahead() {
-        if (pos >= size) {
-            pos  = 0;
-            size = gzread(in, buf, buffer_size); } }
+    public:
+        explicit StreamBuffer(gzFile i) : in(i), pos(0), size(0){
+            buf = (unsigned char*)xrealloc(NULL, buffer_size);
+            assureLookahead();
+        }
+        ~StreamBuffer() { free(buf); }
 
-public:
-    explicit StreamBuffer(gzFile i) : in(i), pos(0), size(0){
-        buf = (unsigned char*)xrealloc(NULL, buffer_size);
-        assureLookahead();
-    }
-    ~StreamBuffer() { free(buf); }
-
-    int  operator *  () const { return (pos >= size) ? EOF : buf[pos]; }
-    void operator ++ ()       { pos++; assureLookahead(); }
-    int  position    () const { return pos; }
-};
+        int  operator *  () const { return (pos >= size) ? EOF : buf[pos]; }
+        void operator ++ ()       { pos++; assureLookahead(); }
+        int  position    () const { return pos; }
+    };
 
 
 //-------------------------------------------------------------------------------------------------
 // End-of-file detection functions for StreamBuffer and char*:
 
 
-static inline bool isEof(StreamBuffer& in) { return *in == EOF;  }
+    static inline bool isEof(StreamBuffer& in) { return *in == EOF;  }
+#endif
+
 static inline bool isEof(const char*   in) { return *in == '\0'; }
 
 //-------------------------------------------------------------------------------------------------

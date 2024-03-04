@@ -52,7 +52,7 @@ extern void   sigTerm(void handler(int));      // Set up handling of available t
 //-------------------------------------------------------------------------------------------------
 // Implementation of inline functions:
 
-#if defined(_MSC_VER) || defined(__MINGW32__)
+#if defined(_MSC_VER) || defined(__MINGW32__) || defined(__wasm)
 #include <time.h>
 
 static inline double Minisat::cpuTime(void) { return (double)clock() / CLOCKS_PER_SEC; }

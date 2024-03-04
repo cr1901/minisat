@@ -18,6 +18,10 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **************************************************************************************************/
 
+#ifdef MINISAT_LIBRARY_ONLY
+    #error MiniSAT binaries are unavailable when MINISAT_LIBRARY_ONLY is defined
+#endif
+
 #include <errno.h>
 #include <zlib.h>
 

@@ -7,6 +7,7 @@ cmake_policy(SET CMP0042 NEW)
 
 option(STATIC_BINARIES "Link binaries statically." ON)
 option(USE_SORELEASE   "Use SORELEASE in shared library filename." ON)
+option(LIBRARY_ONLY "Build only minisat library (ZLIB not needed- dependents require -DMINISAT_LIBRARY_ONLY)" OFF)
 
 #--------------------------------------------------------------------------------------------------
 # Library version:
@@ -26,14 +27,23 @@ set(MINISAT_SOVERSION ${MINISAT_SOMAJOR})
 #--------------------------------------------------------------------------------------------------
 # Dependencies:
 
-find_package(ZLIB)
-include_directories(${ZLIB_INCLUDE_DIR})
+if(LIBRARY_ONLY)
+  add_definitions(-DMINISAT_LIBRARY_ONLY)
+else()
+  find_package(ZLIB)
+  include_directories(${ZLIB_INCLUDE_DIR})
+endif()
+
 include_directories(${minisat_SOURCE_DIR})
 
 #--------------------------------------------------------------------------------------------------
 # Compile flags:
 
 add_definitions(-D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS)
+
+if(WASI)
+  add_definitions(-D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_SIGNAL)
+endif()
 
 #--------------------------------------------------------------------------------------------------
 # Build Targets:
@@ -45,38 +55,66 @@ set(MINISAT_LIB_SOURCES
     minisat/simp/SimpSolver.cc)
 
 add_library(minisat-lib-static STATIC ${MINISAT_LIB_SOURCES})
-add_library(minisat-lib-shared SHARED ${MINISAT_LIB_SOURCES})
+if(NOT WASI)
+  add_library(minisat-lib-shared SHARED ${MINISAT_LIB_SOURCES})
+endif()
 
-target_link_libraries(minisat-lib-shared ${ZLIB_LIBRARY})
+if(NOT WASI)
+  target_link_libraries(minisat-lib-shared ${ZLIB_LIBRARY})
+endif()
 target_link_libraries(minisat-lib-static ${ZLIB_LIBRARY})
 
-add_executable(minisat_core minisat/core/Main.cc)
-add_executable(minisat_simp minisat/simp/Main.cc)
+if(NOT LIBRARY_ONLY)
+  if(WASI)
+    message(FATAL_ERROR "WASI build of MiniSAT does not support binaries yet.")
+  endif()
 
-if(STATIC_BINARIES)
-  target_link_libraries(minisat_core minisat-lib-static)
-  target_link_libraries(minisat_simp minisat-lib-static)
-else()
-  target_link_libraries(minisat_core minisat-lib-shared)
-  target_link_libraries(minisat_simp minisat-lib-shared)
+  add_executable(minisat_core minisat/core/Main.cc)
+  add_executable(minisat_simp minisat/simp/Main.cc)
+
+  if(STATIC_BINARIES)
+    target_link_libraries(minisat_core minisat-lib-static)
+    target_link_libraries(minisat_simp minisat-lib-static)
+  else()
+    target_link_libraries(minisat_core minisat-lib-shared)
+    target_link_libraries(minisat_simp minisat-lib-shared)
+  endif()
 endif()
 
 set_target_properties(minisat-lib-static PROPERTIES OUTPUT_NAME "minisat")
-set_target_properties(minisat-lib-shared
-  PROPERTIES
-    OUTPUT_NAME "minisat" 
-    VERSION ${MINISAT_VERSION}
-    SOVERSION ${MINISAT_SOVERSION})
+if(NOT WASI)
+  set_target_properties(minisat-lib-shared
+    PROPERTIES
+      OUTPUT_NAME "minisat"
+      VERSION ${MINISAT_VERSION}
+      SOVERSION ${MINISAT_SOVERSION})
+endif()
 
-set_target_properties(minisat_simp       PROPERTIES OUTPUT_NAME "minisat")
+if(NOT LIBRARY_ONLY)
+  set_target_properties(minisat_simp       PROPERTIES OUTPUT_NAME "minisat")
+endif()
 
 #--------------------------------------------------------------------------------------------------
 # Installation targets:
 
-install(TARGETS minisat-lib-static minisat-lib-shared minisat_core minisat_simp 
+install(TARGETS minisat-lib-static
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)
+
+if(NOT WASI)
+  install(TARGETS minisat-lib-shared
+          RUNTIME DESTINATION bin
+          LIBRARY DESTINATION lib
+          ARCHIVE DESTINATION lib)
+endif()
+
+if(NOT LIBRARY_ONLY)
+  install(TARGETS minisat_core minisat_simp
+          RUNTIME DESTINATION bin
+          LIBRARY DESTINATION lib
+          ARCHIVE DESTINATION lib)
+endif()
 
 install(DIRECTORY minisat/mtl minisat/utils minisat/core minisat/simp
         DESTINATION include/minisat
